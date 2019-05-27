@@ -3,12 +3,10 @@
 namespace App\Models;
 
 use App\Collection\BaseCollection;
-use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 /**
  * Class Base
@@ -54,10 +52,12 @@ abstract class Base extends Model
     protected static function boot()
     {
         parent::boot();
-        static::addGlobalScope('defaultSort',
+        static::addGlobalScope(
+            'defaultSort',
             function (Builder $builder) {
                 $builder->orderBy($builder->getModel()->table . '.' . $builder->getModel()->primaryKey, 'desc');
-            });
+            }
+        );
     }
 
 
@@ -109,60 +109,23 @@ abstract class Base extends Model
 
     public function toApi()
     {
-        return array_merge($this->attributesToArray(), $this->relationsToApi());
-    }
-
-    public function relationsToApi()
-    {
-        $attributes = [];
-
-        foreach ($this->getArrayableRelations() as $key => $value) {
-            // If the values implements the Arrayable interface we can just call this
-            // toArray method on the instances which will convert both models and
-            // collections to their proper array form and we'll set the values.
-            if ($value instanceof Arrayable) {
-                $relation = $value->toApi();
-            }
-
-            // If the value is null, we'll still go ahead and set it in this list of
-            // attributes since null is used to represent empty relationships if
-            // if it a has one or belongs to type relationships on the models.
-            elseif (is_null($value)) {
-                $relation = $value;
-            }
-
-            // If the relationships snake-casing is enabled, we will snake case this
-            // key so that the relation attribute is snake cased in this returned
-            // array to the developers, making this consistent with attributes.
-            if (static::$snakeAttributes) {
-                $key = Str::snake($key);
-            }
-
-            // If the relation value has been set, we will set it on this attributes
-            // list for returning. If it was not arrayable or null, we'll not set
-            // the value on the array because it is some type of invalid value.
-            if (isset($relation) || is_null($value)) {
-                $attributes[$key] = $relation;
-            }
-
-            unset($relation);
-        }
-
-        return $attributes;
+        return $this->attributesToArray();
     }
 
     public function save(array $options = [])
     {
         if ($re = parent::save($options)) {
-            foreach ($this->savedEvents as $v) {
-                event($v);
+            $events = $this->savedEvents;
+            $this->savedEvents = [];
+            while ($events) {
+                event(array_shift($events));
             }
 
-            foreach ($this->savedJobs as $v) {
-                dispatch($v);
-            }
-            $this->savedEvents = [];
+            $jobs = $this->savedJobs;
             $this->savedJobs = [];
+            while ($jobs) {
+                dispatch(array_shift($jobs));
+            }
         }
 
         return $re;

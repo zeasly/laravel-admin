@@ -39,8 +39,9 @@ class ManagerController extends Controller
                     'remark'   => '',
                 ]
             );
-            $manage = new Manager($data);
-            $manage->save();
+            $manager = new Manager($data);
+            $manager->password = $data['password'];
+            $manager->save();
 
             return $this->jsonResponse(1, '管理员添加成功');
         }
@@ -69,8 +70,8 @@ class ManagerController extends Controller
                     'remark'   => '',
                 ]
             );
-            if ($data['password'] == '') {
-                unset($data['password']);
+            if ($data['password']) {
+                $manager->password = $data['password'];
             }
             $manager->fill($data);
             $manager->save();
